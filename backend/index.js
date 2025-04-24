@@ -312,10 +312,31 @@ app.get("/usercount", async (req, res) => {
     const result = await db.query("SELECT * FROM logindata");
     const usercount = parseInt(result.rows.length);
     res.json({ usercount });
-    console.log(usercount);
   } catch (err) {
     console.error("Error:", err);
     res.status(500).json({ error: "Failed to fetch user count" });
+  }
+});
+
+//Costamized API to get rows of values for Pie at Reminder page
+app.get("/reminderspie", validateToken, async (req, res) => {
+  try {
+    const { rows: [{ personalcount, familycount, workcount, groupactivitycount }] } = await db.query(
+      `SELECT 
+        COUNT(*) FILTER (WHERE completestatus AND currentstatus AND type = 'Personal')::integer AS personalcount,
+        COUNT(*) FILTER (WHERE completestatus AND currentstatus AND type = 'Work')::integer AS workcount,
+        COUNT(*) FILTER (WHERE completestatus AND currentstatus AND type = 'Family')::integer AS familycount,
+        COUNT(*) FILTER (WHERE completestatus AND currentstatus AND type = 'Group Activity')::integer AS groupactivitycount
+      FROM post 
+      WHERE user_id = $1`,
+      [req.userId]
+    );
+
+    res.json({ personalcount, familycount, workcount, groupactivitycount });
+    console.log({ personalcount, familycount, workcount, groupactivitycount });
+  } catch (err) {
+    console.error('Error fetching reminders:', err);
+    res.status(500).json({ error: 'Failed to fetch reminders' });
   }
 });
 
