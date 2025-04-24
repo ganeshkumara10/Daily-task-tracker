@@ -5,6 +5,7 @@ import bodyParser from "body-parser";
 import env from "dotenv";
 import jwt from "jsonwebtoken";
 import bcrypt from "bcryptjs";
+import { count } from "console";
 
 const app = express();
 const port = process.env.PORT || 3000;
@@ -52,45 +53,20 @@ const validateToken = (req, res, next) => {
   });
 };
 
-// POST carousel images
-app.post("/carouselimages", async (req, res) => {
-  const { imgurl, maker } = req.body;
-  if (!imgurl || !maker) {
-    return res.status(400).json({ error: "Image URL and maker are required" });
-  }
-
-  try {
-    const result = await db.query(
-      "INSERT INTO carouselimages (imgurl, maker) VALUES ($1, $2) RETURNING *",
-      [imgurl, maker]
-    );
-    res.status(201).json(result.rows[0]);
-  } catch (err) {
-    console.error("Error inserting carousel image:", err);
-    res.status(500).json({ error: "Failed to add carousel image" });
-  }
-});
-
-// GET carousel images
-app.get("/carouselimages", async (req, res) => {
-  try {
-    const result = await db.query("SELECT * FROM carouselimages");
-    res.json(result.rows);
-  } catch (err) {
-    console.error("Error fetching carousel images:", err);
-    res.status(500).json({ error: "Failed to fetch carousel images" });
-  }
-});
-
 // POST registration
 app.post("/register", async (req, res) => {
   const { email, password, firstname, lastname } = req.body;
   if (!email || !password || !firstname || !lastname) {
-    return res.status(400).json({ error: "Email, password, firstname, and lastname are required" });
+    return res
+      .status(400)
+      .json({ error: "Email, password, firstname, and lastname are required" });
   }
 
   try {
-    const checkResult = await db.query("SELECT * FROM logindata WHERE email = $1", [email]);
+    const checkResult = await db.query(
+      "SELECT * FROM logindata WHERE email = $1",
+      [email]
+    );
     if (checkResult.rows.length > 0) {
       return res.status(409).json({ error: "Email already registered" });
     }
@@ -100,7 +76,13 @@ app.post("/register", async (req, res) => {
       "INSERT INTO logindata (email, password, firstname, lastname) VALUES ($1, $2, $3, $4) RETURNING id, email, firstname, lastname",
       [email, hashedPassword, firstname, lastname]
     );
-    res.status(201).json({ success: true, message: "User registered successfully", user: result.rows[0] });
+    res
+      .status(201)
+      .json({
+        success: true,
+        message: "User registered successfully",
+        user: result.rows[0],
+      });
   } catch (err) {
     console.error("Error registering user:", err);
     res.status(500).json({ error: "Failed to register user" });
@@ -115,7 +97,9 @@ app.post("/login", async (req, res) => {
   }
 
   try {
-    const result = await db.query("SELECT * FROM logindata WHERE email = $1", [email]);
+    const result = await db.query("SELECT * FROM logindata WHERE email = $1", [
+      email,
+    ]);
     if (result.rows.length === 0) {
       return res.status(404).json({ error: "User not found" });
     }
@@ -126,12 +110,17 @@ app.post("/login", async (req, res) => {
       return res.status(401).json({ error: "Incorrect password" });
     }
 
-    const token = jwt.sign({ userId: user.id, email: user.email }, jwtSecretKey, { expiresIn: "1h" });
+    const token = jwt.sign(
+      { userId: user.id, email: user.email },
+      jwtSecretKey,
+      { expiresIn: "1h" }
+    );
     res.status(200).json({
       success: true,
       message: "Logged in successfully",
       token,
       firstname: user.firstname,
+      lastname: user.lastname,
     });
   } catch (err) {
     console.error("Error logging in:", err);
@@ -139,21 +128,7 @@ app.post("/login", async (req, res) => {
   }
 });
 
-// GET user data for userpage
-app.get("/user", validateToken, async (req, res) => {
-  try {
-    const result = await db.query("SELECT firstname, email FROM logindata WHERE id = $1", [req.userId]);
-    if (result.rows.length === 0) {
-      return res.status(404).json({ error: "User not found" });
-    }
-    res.json(result.rows[0]);
-  } catch (err) {
-    console.error("Error fetching user:", err);
-    res.status(500).json({ error: "Failed to fetch user information" });
-  }
-});
-
-// GET pending tasks (completestatus = FALSE, currentstatus = FALSE)
+// GET pending tasks ( with completestatus = FALSE, currentstatus = FALSE)
 app.get("/tasks", validateToken, async (req, res) => {
   try {
     const result = await db.query(
@@ -167,7 +142,8 @@ app.get("/tasks", validateToken, async (req, res) => {
   }
 });
 
-// GET completed tasks (completestatus = TRUE, currentstatus = FALSE)
+
+// GET completed tasks (with completestatus = TRUE, currentstatus = FALSE)
 app.get("/taskschange", validateToken, async (req, res) => {
   try {
     const result = await db.query(
@@ -183,15 +159,32 @@ app.get("/taskschange", validateToken, async (req, res) => {
 
 // POST new task
 app.post("/tasks", validateToken, async (req, res) => {
-  const { task, type, timeofentry, completestatus, remindertime, currentstatus } = req.body;
+  const {
+    task,
+    type,
+    timeofentry,
+    completestatus,
+    remindertime,
+    currentstatus,
+  } = req.body;
   if (!task || !type || !remindertime) {
-    return res.status(400).json({ error: "Task, type, and remindertime are required" });
+    return res
+      .status(400)
+      .json({ error: "Task, type, and remindertime are required" });
   }
 
   try {
     const result = await db.query(
       "INSERT INTO post (user_id, task, type, timeofentry, completestatus, remindertime, currentstatus) VALUES ($1, $2, $3, $4, $5, $6, $7) RETURNING *",
-      [req.userId, task, type, timeofentry, completestatus, remindertime, currentstatus]
+      [
+        req.userId,
+        task,
+        type,
+        timeofentry,
+        completestatus,
+        remindertime,
+        currentstatus,
+      ]
     );
     res.status(201).json(result.rows[0]);
   } catch (err) {
@@ -283,17 +276,46 @@ app.patch("/taskschange/:id", validateToken, async (req, res) => {
   }
 });
 
-
 // GET data for overdue tasks (completestatus = FALSE, currentstatus = FALSE)
 app.get("/remindertasks", validateToken, async (req, res) => {
   try {
     const result = await db.query(
       "SELECT * FROM post WHERE user_id = $1 AND remindertime - CURRENT_TIMESTAMP < INTERVAL '30 minutes' ORDER BY timeofentry DESC LIMIT 5",
-      [req.userId]);
+      [req.userId]
+    );
     res.json(result.rows);
   } catch (err) {
     console.error("Error fetching pending tasks:", err);
     res.status(500).json({ error: "Failed to fetch pending tasks" });
+  }
+});
+
+//Get data for Reminders page (summary)
+app.get("/reminders", validateToken, async (req, res) => {
+  try {
+    const result = await db.query(
+      "SELECT COUNT(*) AS count, COUNT(*) FILTER(WHERE completestatus = false AND currentstatus = false) AS pendingcount FROM post WHERE user_id = $1",
+      [req.userId]
+    );
+    const count = parseInt(result.rows[0].count);
+    const pendingcount = parseInt(result.rows[0].pendingcount);
+    res.json({ count, pendingcount });
+  } catch (err) {
+    console.error("null", err);
+    res.status(500).json({ error: "Failed to fetch pending tasks" });
+  }
+});
+
+//Global API to get count of users registered
+app.get("/usercount", async (req, res) => {
+  try {
+    const result = await db.query("SELECT * FROM logindata");
+    const usercount = parseInt(result.rows.length);
+    res.json({ usercount });
+    console.log(usercount);
+  } catch (err) {
+    console.error("Error:", err);
+    res.status(500).json({ error: "Failed to fetch user count" });
   }
 });
 
