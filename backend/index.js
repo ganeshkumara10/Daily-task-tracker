@@ -5,10 +5,14 @@ import bodyParser from "body-parser";
 import env from "dotenv";
 import jwt from "jsonwebtoken";
 import bcrypt from "bcryptjs";
-import { count } from "console";
+import nodemailer from "nodemailer";
+import { CronJob } from 'cron';
+import { DateTime } from 'luxon';
+import { Console } from "console";
+//import { format, addMinutes, parse, differenceInSeconds } from 'date-fns';
 
 const app = express();
-const port = process.env.PORT || 3000;
+const port = 3000;
 
 // Middleware
 env.config();
@@ -31,6 +35,17 @@ const db = new pg.Client({
   port: process.env.PG_PORT,
 });
 db.connect();
+
+// Nodemailer transporter for MailSend SMTP
+const transporter = nodemailer.createTransport({
+  host: process.env.SMTP_HOST,
+  port: process.env.SMTP_PORT,
+  secure: false,
+  auth: {
+    user: process.env.SMTP_USER,
+    pass: process.env.SMTP_PASS,
+  },
+});
 
 // JWT Secret Key
 const jwtSecretKey = process.env.SECRET;
@@ -276,19 +291,6 @@ app.patch("/taskschange/:id", validateToken, async (req, res) => {
   }
 });
 
-// GET data for overdue tasks (completestatus = FALSE, currentstatus = FALSE)
-app.get("/remindertasks", validateToken, async (req, res) => {
-  try {
-    const result = await db.query(
-      "SELECT * FROM post WHERE user_id = $1 AND remindertime - CURRENT_TIMESTAMP < INTERVAL '30 minutes' ORDER BY timeofentry DESC LIMIT 5",
-      [req.userId]
-    );
-    res.json(result.rows);
-  } catch (err) {
-    console.error("Error fetching pending tasks:", err);
-    res.status(500).json({ error: "Failed to fetch pending tasks" });
-  }
-});
 
 //Get data for Reminders page (summary)
 app.get("/reminders", validateToken, async (req, res) => {
@@ -340,6 +342,68 @@ app.get("/reminderspie", validateToken, async (req, res) => {
   }
 });
 
+//Function to check and send reminders
+async function checkAndSendReminders() {
+  try{
+    const now =DateTime.now().setZone('Asia/Kolkata');
+    const reminderTimeLower = now.plus({ minutes: 14, seconds: 30 });
+    const reminderTimeUpper = now.plus({ minutes: 15, seconds: 30 });
+
+    
+    // Query to JOIN the data and send to mailOptions
+    const query = `
+      SELECT p.remindertime, p.completestatus, p.type, p.task, l.email, l.firstname, l.lastname,
+             TO_TIMESTAMP(p.remindertime, 'DD/MM/YYYY, HH12:MI:SS AM') as parsed_time
+      FROM post p
+      JOIN logindata l ON p.user_id = l.id
+      WHERE p.completestatus = false
+      AND TO_TIMESTAMP(p.remindertime, 'DD/MM/YYYY, HH12:MI:SS AM') BETWEEN $1 AND $2
+    `;
+    const values = [
+      reminderTimeLower.toFormat('dd/MM/yyyy, hh:mm:ss a'),
+      reminderTimeUpper.toFormat('dd/MM/yyyy, hh:mm:ss a'),
+    ];
+    const res = await db.query(query, values);
+
+    if (!Array.isArray(res.rows)) {
+      console.error('Query result rows is not an array:', res.rows.length);
+      return;
+    }
+
+  if(res.rows.length > 0){
+    console.log(`Tasks found: ${res.rows.length}`);
+    for(const row of res.rows){
+      const mailOptions = {
+        //Customized mail for task reminder
+        from: process.env.SMTP_EMAIL,
+        to: row.email,
+        subject: 'Upcoming Task Reminder',
+        text: `Dear ${row.firstname} ${row.lastname},\n\nThis is a reminder for your task which is scheduled at ${row.remindertime}\n Type: ${row.type}\n Task: ${row.task}.\n Please complete it soon!\n\nBest regards,\nDaily task Tracker 🩷`,
+      };
+
+      await transporter.sendMail(mailOptions);
+      console.log(`Email sent to ${row.email}`);
+      }
+    }else {
+      //Console to check if tasks are not found
+      // console.log('No tasks found for reminder window', {
+      //   lower: reminderTimeLower.toFormat('dd/MM/yyyy, hh:mm:ss a'),
+      //   upper: reminderTimeUpper.toFormat('dd/MM/yyyy, hh:mm:ss a'),
+      // });
+    }
+  }catch(err){
+    console.error('Error in CheckAndSendReminers:',err);
+  }   
+}
+
+const job = new CronJob('* * * * *', checkAndSendReminders, null, true, 'Asia/Kolkata');
+job.start();
+process.on('SIGINT', async () => {
+  job.stop();
+  await db.end();
+  console.log('Cron job stopped and database connection closed.');
+  process.exit(0);
+});
 
 // Start the server
 app.listen(port, () => {

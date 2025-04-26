@@ -1,0 +1,20 @@
+.order{
+    display: flex;
+    flex-direction: column;
+    width: 100px;
+}
+.homepageText{
+    display: flex;
+    flex-direction: column;
+    flex-wrap: nowrap;
+    margin-top: 10px;
+    align-content: center;
+    width: 500px;
+}
+.frontHomepage{
+    display: flex;
+    flex-direction: row;
+    justify-content: center;
+    align-items: center;
+    margin-right: 250px;
+}
