@@ -12,8 +12,7 @@ import { Console } from "console";
 //import { format, addMinutes, parse, differenceInSeconds } from 'date-fns';
 
 const app = express();
-const port = 3000;
-
+const port = process.env.SERVER_PORT || 3000;
 // Middleware
 env.config();
 app.use(express.json());
@@ -27,12 +26,19 @@ app.use(
 app.use(express.static("public"));
 
 // PostgreSQL database connection
-const db = new pg.Client({
-  user: process.env.PG_USER,
-  host: process.env.PG_HOST,
-  database: process.env.PG_DATABASE,
-  password: process.env.PG_PASSWORD,
-  port: process.env.PG_PORT,
+// const db = new pg.Client({
+//   user: process.env.PG_USER,
+//   host: process.env.PG_HOST,
+//   database: process.env.PG_DATABASE,
+//   password: process.env.PG_PASSWORD,
+//   port: process.env.PG_PORT,
+// });
+
+
+
+const db = new db({
+  connectionString: process.env.DATABASE_URL,
+  ssl: { rejectUnauthorized: false },
 });
 db.connect();
 
@@ -335,7 +341,7 @@ app.get("/reminderspie", validateToken, async (req, res) => {
     );
 
     res.json({ personalcount, familycount, workcount, groupactivitycount });
-    console.log({ personalcount, familycount, workcount, groupactivitycount });
+    //console.log({ personalcount, familycount, workcount, groupactivitycount });
   } catch (err) {
     console.error('Error fetching reminders:', err);
     res.status(500).json({ error: 'Failed to fetch reminders' });

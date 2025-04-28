@@ -4,6 +4,7 @@
 /node_modules
 /.pnp
 .pnp.js
+.envgit branch -M main
 
 # testing
 /coverage
