@@ -25,21 +25,22 @@ app.use(
 );
 app.use(express.static("public"));
 
-// PostgreSQL database connection
+//PostgreSQL database connection
+const db = new pg.Client({
+  user: process.env.PG_USER,
+  host: process.env.PG_HOST,
+  database: process.env.PG_DATABASE,
+  password: process.env.PG_PASSWORD,
+  port: process.env.PG_PORT,
+});
+
+
+// console.log('DATABASE_URL:', process.env.DATABASE_URL);
 // const db = new pg.Client({
-//   user: process.env.PG_USER,
-//   host: process.env.PG_HOST,
-//   database: process.env.PG_DATABASE,
-//   password: process.env.PG_PASSWORD,
-//   port: process.env.PG_PORT,
+//   connectionString: process.env.DATABASE_URL,
+//   ssl: { rejectUnauthorized: false },
 // });
 
-
-
-const db = new db({
-  connectionString: process.env.DATABASE_URL,
-  ssl: { rejectUnauthorized: false },
-});
 db.connect();
 
 // Nodemailer transporter for MailSend SMTP
